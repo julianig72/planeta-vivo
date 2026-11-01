@@ -91,13 +91,21 @@ test('real REData, peninsular map, daily technologies, hourly replay and respons
   await expect(page.locator('#sources-dialog')).toContainText('Canarias, Baleares, Ceuta y Melilla');
   await page.keyboard.press('Escape');
   await page.locator('#overview').click();
-  await page.setViewportSize({ width: 1280, height: 720 });
-  expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-  for (const selector of ['.intro', '.side-panel', '.map-controls']) {
-    const box = await page.locator(selector).boundingBox();
-    const playback = await page.locator('.playback').boundingBox();
-    expect(box!.y + box!.height).toBeLessThan(playback!.y);
+  for (const viewport of [{ width: 1100, height: 700 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    for (const selector of ['.intro', '.side-panel', '.map-controls']) {
+      const box = await page.locator(selector).boundingBox();
+      const playback = await page.locator('.playback').boundingBox();
+      expect(box!.y + box!.height).toBeLessThan(playback!.y);
+    }
+    const controls = await page.locator('.map-controls').boundingBox();
+    const intro = await page.locator('.intro').boundingBox();
+    const side = await page.locator('.side-panel').boundingBox();
+    expect(controls!.x).toBeGreaterThan(intro!.x + intro!.width);
+    expect(controls!.x + controls!.width).toBeLessThan(side!.x);
   }
+  if (captures) await page.screenshot({ path: join(captures, 'espana-energia-compact.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (captures) await page.screenshot({ path: join(captures, 'espana-energia-movil.png'), fullPage: true });
