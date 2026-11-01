@@ -1,6 +1,6 @@
 # España respira energía · Planeta vivo
 
-Una experiencia cinematográfica sobre la energía de **España peninsular**. Un mapa 3D reconocible respira con la demanda horaria; el anillo muestra la generación diaria solar, eólica, hidráulica, nuclear y demás tecnologías. Reproduce un día real en 30 segundos, con fecha y reloj visibles. No es un dashboard de red ni telemetría en tiempo real.
+Una experiencia cinematográfica sobre **cómo cambia la generación eléctrica de España peninsular**. El gráfico temporal es el protagonista: áreas apiladas solares, eólicas, hidráulicas, nucleares y de otras fuentes. Recorre varias semanas reales en 30 segundos, con fechas visibles, cantidades y cambios por tecnología. No hay mapa ornamental ni un mix fijo presentado como evolución.
 
 ## Ejecutar
 
@@ -21,30 +21,32 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Las pruebas end-to-end usan las fuentes reales y necesitan Internet. También verifican fallos de actualización y observaciones ausentes mediante respuestas de prueba explícitas, nunca incorporadas a la aplicación. Stack: Vite, TypeScript y Three.js. Sin backend, claves, cuentas ni ESIOS.
+Las pruebas end-to-end usan las fuentes reales y necesitan Internet. Contrastan las cifras y sus cambios con la respuesta pública, miden la reproducción y comprueban la interfaz. También verifican errores y días ausentes mediante respuestas de prueba explícitas, nunca incorporadas a la aplicación. Stack: Vite, TypeScript y SVG nativo; sin biblioteca de gráficos, backend, claves, cuentas ni ESIOS.
 
 ## Qué se ve y qué cambia
 
-- **Demanda de la hora:** potencia media equivalente, en GW. El valor corresponde al intervalo indicado, no a un instante. La curva utiliza escalones de horas reales; las cifras no se interpolan.
-- **Generación sin emisiones CO₂ eq. de la hora:** porcentaje de las series horarias clasificadas por Red Eléctrica. Incluye nuclear. **No significa porcentaje renovable**, ni emisiones de ciclo de vida.
-- **Mix por tecnología:** energía total del día en GWh y porcentaje sobre la generación diaria publicada. Solar agrupa fotovoltaica y térmica; «Otras» conserva y permite inspeccionar todas las tecnologías restantes disponibles.
-- **El anillo es diario y fijo.** No cambia al reproducir las horas. La API verificada no admite aquí `time_trunc=hour` para el mix por tecnología; no inventamos una curva de solar o eólica distribuyendo totales diarios.
-- El brillo del mapa refleja la demanda normalizada dentro de ese mismo día. Los colores y puntos son recursos gráficos agregados; **no son centrales, sensores, producción regional ni flujos entre ciudades**.
-- La luz y el botón «Ir al amanecer» usan una aproximación astronómica para Madrid (40,4° N, 3,7° O). No son mediciones solares, ni prueban producción fotovoltaica a esa hora.
+- **Gráfico dominante:** valores de generación publicados por tecnología en áreas apiladas, con referencia cero, eje en GWh y fechas. Cada escalón corresponde a un día completo publicado. Si un grupo es negativo va bajo cero y una línea discontinua indica el total firmado.
+- **Seis colores consistentes:** solar (fotovoltaica + térmica), eólica, hidráulica, nuclear, ciclo combinado y Otras. Esta última conserva los componentes publicados para consultarlos en fuentes.
+- **Cursor y reproducción:** la columna iluminada y la fecha indican el agregado seleccionado. El cursor recorre la gráfica; las cifras cambian únicamente al entrar en otro día, sin interpolación numérica.
+- **Magnitudes y cambios:** el panel muestra GWh y porcentaje del día, más la diferencia en GWh frente al día calendario anterior. Si falta un día, no se calcula una comparación atravesando el hueco.
+- **Barras comparables:** las seis usan una misma escala máxima absoluta fija para el período, manteniendo el signo en las cifras. No se renormalizan cada día para aparentar crecimiento. Su transición visual conecta dos valores reales, no crea nuevas medidas.
+- **No hay generación horaria por tecnología en esta vista.** El desglose público verificado es diario. No se fabrican amaneceres ni curvas solares/eólicas a partir de totales diarios.
 
-Selecciona una tecnología en la leyenda o en su arco para ver componentes, energía diaria y porcentaje. Arrastra suavemente o acerca el mapa; «Vista de España» recupera la composición inicial. Se respeta `prefers-reduced-motion` en los efectos y el movimiento.
+Selecciona una fuente para destacar su franja; vuelve a pulsarla o usa «Ver todas las fuentes» para recuperar el conjunto. Explora con el ratón, el deslizador, los botones anterior/siguiente o las flechas del teclado sobre el gráfico. Explorar detiene la reproducción. Se respeta `prefers-reduced-motion` en las transiciones de las barras.
 
 ## Reloj, fecha y disponibilidad
 
-Buscamos el **día completo más reciente entre los tres días anteriores**, empezando por ayer en `Europe/Madrid`. Se comprueba que existan todas las horas de demanda y de generación con/sin emisiones, y el mix diario del mismo día. Si se elige un día anterior, el modal de fuentes explica los intentos y errores; no se oculta la elección.
+Consultamos **los 30 días anteriores a hoy**, empezando por ayer como fecha final, en `Europe/Madrid`. Un único GET obtiene las series diarias por tecnología. La gráfica termina en el último día válido; fechas externas aún no publicadas o no validadas se identifican en el modal.
 
-La fecha y el retraso respecto al final de ese día aparecen en pantalla. **No se presenta como hoy ni como tiempo real.** El resumen abre a mitad del día; reproducir desde ese resumen reinicia a las 00:00 y recorre el día completo en 30 segundos. El final queda en pausa a las 24:00. Pausa, desliza el reloj, salta al amanecer o vuelve al resumen. Al ocultar la pestaña se pausa el avance efectivo.
+La apertura muestra el último día válido. Reproducir inicia el recorrido completo, de izquierda a derecha, en 30 segundos de pestaña visible. Puedes pausar, explorar o ir al inicio. Al ocultar la pestaña se pausa. El final queda detenido en el último agregado, no en una fecha futura.
 
-Si ninguno de los tres días tiene todas las capas principales, se usa el que conserva más capas reales válidas (y, en igualdad, el más reciente). Las capas ausentes permanecen identificadas como no disponibles. Así un fallo de demanda no destruye un mix diario válido de otro día; nunca se mezclan fechas entre capas.
+**Resolución diaria, no tiempo real.** La fecha histórica, el período, el último producto, la descarga válida y la antigüedad respecto al final del último día aparecen en pantalla o en fuentes. Un archivo de más de 72 horas se señala como antiguo.
 
-Los límites del día se calculan con la zona peninsular, incluyendo días de cambio de hora de **23 o 25 horas**. Se mantienen los offsets de las observaciones y se muestran CET/CEST en cada intervalo; las dos horas repetidas no se colapsan. Si faltan horas, la capa queda no disponible en lugar de rellenarse.
+Un día interno sin total o sin una tecnología principal se representa como **hueco rayado**, con cifras no disponibles. No se conecta por interpolación ni se reemplaza por cero. Cada día se valida por separado; un sumatorio incoherente no destruye los otros días. Si no hay al menos dos días válidos, la aplicación muestra que no puede comparar generación.
 
-«Actualizar fuentes» vuelve a consultar el mismo día y pausa la reproducción. Se mantienen fecha, ámbito y sincronización; si una capa falla, se conserva su última descarga válida identificada y se muestra el error. El modal distingue la hora del producto de la última descarga válida y del último intento de consulta. Un archivo de más de 72 horas se señala como antiguo. Para buscar el nuevo día más reciente, recarga la aplicación.
+Los días de **23 o 25 horas** conservan la energía diaria real, sin normalizarla a 24 horas. Cada fecha ocupa una columna: es un eje de días calendario, no de horas uniformes.
+
+«Actualizar» consulta el mismo período y pausa. Si falla, se conserva la última serie válida identificada y se muestra el error. El modal distingue hora del producto, descarga válida e intento fallido. Recarga la página para buscar un nuevo período.
 
 ## REData: fuentes efectivas y resolución
 
@@ -68,45 +70,43 @@ geo_ids=8741
 
 | Widget verificado | Resolución utilizada | Contenido |
 | --- | --- | --- |
-| `demanda/evolucion` | `hour` | Demanda, indicador `10297` |
-| `generacion/evolucion-estructura-generacion-emisiones-asociadas` | `hour` | Generación sin/con CO₂ eq., indicadores `1` y `2` |
-| `generacion/estructura-generacion` | `day` | Tecnologías y generación total `10296` |
-| `balance/balance-electrico` | `day` | Renovables, no renovables, almacenamiento, intercambios y demanda |
+| `generacion/estructura-generacion` | `day` | Series temporales de tecnologías y generación total `10296` |
 
 Ejemplo efectivo:
 
 ```text
-https://apidatos.ree.es/es/datos/balance/balance-electrico?start_date=2026-10-30T00:00&end_date=2026-10-30T23:59&time_trunc=day&geo_trunc=electric_system&geo_limit=peninsular&geo_ids=8741
+https://apidatos.ree.es/es/datos/generacion/estructura-generacion?start_date=2026-10-02T00:00&end_date=2026-10-31T23:59&time_trunc=day&geo_trunc=electric_system&geo_limit=peninsular&geo_ids=8741
 ```
 
-En la verificación del 30/10/2026 hubo 24 observaciones horarias completas. Demanda horaria sumada: **642.367,2 MWh**. Generación horaria con/sin emisiones sumada: **700.633,9 MWh**, igual al mix diario publicado. Estas comprobaciones establecen la correspondencia energética: MWh por intervalo horario equivale numéricamente a MW medios durante esa hora; dividimos entre 1.000 para GW. Los agregados diarios se convierten de MWh a GWh, no se suman potencias como si fueran energías.
+En la verificación del 01/11/2026, ese rango devolvió **29 días reales, del 02 al 30 de octubre**; el 31 aún no tenía total publicado. Solar cambió de **139.445,86 MWh** a **162.270,1 MWh** y eólica de **157.420,33 MWh** a **44.040,6 MWh**. El total del 30 fue **700.633,9 MWh**, comprobado previamente contra su suma horaria publicada. Las cifras diarias se dividen entre 1.000 para GWh: son energía, no potencia instantánea.
 
-El navegador pudo consultar las fuentes directamente mediante CORS. La API documenta **GET**; no se asume que HEAD u otras operaciones estén permitidas. Se consultan bajo demanda con un máximo de 22 segundos por widget. `estructura-generacion`, `balance-electrico` y otros widgets diarios probados devolvieron HTTP 400 con `hour`; no se da por hecho que todos admitan todas las resoluciones enumeradas por la API.
+El navegador consulta directamente mediante CORS, con un máximo de 22 segundos por GET. Se revisó la lista real de widgets de la documentación oficial y se probaron con `hour`: `estructura-generacion`, `estructura-renovables`, `evolucion-renovable-no-renovable`, `estructura-generacion-emisiones-asociadas` y `no-renovables-detalle-emisiones-CO2`. Todos devolvieron HTTP 400 para el día verificado. Las categorías con/sin emisiones horarias de la versión anterior no aportan ese desglose y ya no protagonizan la experiencia. No se da por hecho que todos los widgets admitan todas las resoluciones enumeradas por la API.
 
-Las respuestas pueden contener `magnitude: null`; por eso las unidades no se deducen de ese campo ni de un porcentaje aislado. Se valida la resolución, los sumatorios horarios frente al día, los tipos y las horas. Los `percentage` de la fuente pueden referirse a subgrupos (especialmente en balance); **no se suman**. El mix se calcula usando los valores de las tecnologías y el total diario verificado.
+Las respuestas pueden contener `magnitude: null`; las unidades no se deducen de ese campo ni de un porcentaje aislado. Se validan tipos numéricos finitos, fechas con zona, medianoches peninsulares, duplicados y sumas diarias. Los `percentage` de la fuente **no se suman**: el mix usa valores tecnológicos y el total diario publicado.
 
-## Balance, almacenamiento y signos
+## Sumas, componentes ausentes y clasificación
 
-El balance observado se cumple como:
+El apilado se valida como:
 
 ```text
-generación renovable + generación no renovable
-+ saldo almacenamiento + saldo internacional + enlace Península–Baleares
-= demanda en barras de central
+solar + eólica + hidráulica + nuclear + ciclo combinado + otras
+= generación tecnológica total publicada del día
 ```
 
-El total del mix tecnológico **excluye almacenamiento** en este producto. La turbinación de bombeo (`1445`) es positiva y el consumo de bombeo (`1472`) negativo; su suma es el saldo (`10483`). No se cuenta a la vez una categoría total y sus componentes. No se etiqueta la turbinación como renovable ni se mete el consumo negativo en un gráfico de porcentajes de generación.
+El total tecnológico **excluye almacenamiento** en el producto verificado. No añadimos bombeo consumidor, turbinación ni intercambios a las franjas. No se cuenta un total junto con sus componentes. Nuclear no se etiqueta como renovable. Esta vista no afirma que generación sea igual a demanda.
 
-Saldo internacional (`1474`) y enlace Península–Baleares (`1473`): positivo aporta al sistema peninsular; negativo sale de él. No se confunden saldo neto y flujos brutos. Los mostramos separados en el modal, sin atribuir al mix de Baleares el agregado peninsular ni simular rutas geográficas.
+Se conservan **valores negativos reales**: carbón fue −13 MWh el 17/10, −120 MWh el 18/10 y negativo en otros tres días del período. La suma publicada cierra con esos signos, y Otras conserva su contribución firmada. No se borran fechas, se cambia el signo ni se recorta a cero. Si un grupo agregado resulta negativo se dibuja bajo cero, sin confundirlo con producción positiva. La API no explica aquí la causa física de esos signos; no inventamos una interpretación ni afirmamos que sean cifras brutas.
 
-Se comprueba el cierre de balance, la suma de tecnologías y la correspondencia entre capas. Tolerancia de redondeo: 2 MWh. Un desacuerdo invalida visiblemente la capa afectada, no se fuerza la suma ni se cambia el signo.
+Una tecnología principal sin dato invalida ese día. Algunos componentes menores no tienen registro individual en ciertas fechas: por ejemplo, «Turbina de vapor» no apareció el 03 y 04 de octubre. Se muestran como **sin valor publicado**, no se crean registros cero. Otras suma los componentes disponibles solo si el conjunto sigue cerrando contra el total publicado. El modal conserva esta limitación y los componentes reales del día.
 
-## Ámbito e imágenes
+Tolerancia de redondeo: 2 MWh. Un desacuerdo invalida visiblemente el día afectado, sin forzar sumas, completar medidas ni cambiar signos.
 
-El mapa representa **España peninsular**; Portugal es contexto geográfico, sin datos eléctricos portugueses. Canarias, Baleares, Ceuta y Melilla **no forman parte del agregado**. No hay supuestas centrales, flujos entre ciudades, series autonómicas ni mediciones locales.
+## Ámbito y licencias
 
-Contornos: **Made with Natural Earth**, dominio público, escala 1:110 millones. [Condiciones](https://www.naturalearthdata.com/about/terms-of-use/) · [archivo vectorial de origen](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson). Los archivos locales en `public/maps` conservan las geometrías de España y Portugal; para la vista se selecciona el mayor polígono continental. La extrusión es decorativa, no elevación real.
+Los datos corresponden a **España peninsular**. Canarias, Baleares, Ceuta y Melilla **no forman parte del agregado**. No se representan centrales, flujos, series autonómicas ni mediciones locales.
 
-Los datos energéticos se atribuyen a Red Eléctrica/REData; su publicación en esta demo no implica respaldo institucional. Three.js, Vite y Vitest: MIT; TypeScript: Apache-2.0; Playwright: Apache-2.0. Los avisos se mantienen en las dependencias. DM Sans y Manrope: SIL Open Font License; si Google Fonts no está disponible se usa la tipografía del sistema.
+La gráfica es SVG original. El mapa 3D anterior se conserva en el historial Git, pero no se descarga ni se renderiza en esta experiencia. Se han retirado los contornos y la dependencia 3D de la versión activa.
+
+Los datos se atribuyen a Red Eléctrica/REData; esta demo no implica respaldo institucional. Vite y Vitest: MIT; TypeScript y Playwright: Apache-2.0. Los avisos se mantienen en las dependencias. DM Sans y Manrope: SIL Open Font License; si Google Fonts no está disponible se usa la tipografía del sistema.
 
 La aplicación no recoge telemetría propia. El navegador contacta REData y Google Fonts. No hay claves, servicios de pago ni datos sintéticos de sustitución.

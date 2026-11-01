@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   HOUR, bounds, midnight, shiftDate, parseDemand, parseGeneration, parseMix, parseBalance,
-  widgetURL, intervalIndex, sceneTime, sunrise, solarAltitude, synchronize, fetchRecentDay, type EnergyDay,
+  widgetURL, intervalIndex, sceneTime, sunrise, solarAltitude, synchronize, fetchRecentDay, parseGenerationHistory,
+  historyURL, historyIndex, type EnergyDay,
 } from './energy';
-import { mainlandPolygon, insidePolygon } from './energy-scene';
 
 const date = '2026-10-30';
 const updated = '2026-10-31T07:20:00+01:00';
@@ -75,11 +75,11 @@ describe('generation, grouping and signed balance', () => {
     expect(mix.groups.reduce((sum, group) => sum + group.share, 0)).toBeCloseTo(1, 12);
     expect(mix.total).toBe(400);
   });
-  it('rejects negative technology energy or totals that do not close', () => {
+  it('rejects totals that do not close, including incoherent signed components', () => {
     const raw = mixRaw();
     raw.included.push(series('new', 'Otra tecnología', [50]));
     expect(() => parseMix(raw, date)).toThrow('no suman');
-    expect(() => parseMix(widget([series('10296', 'Total', [100]), series('1458', 'Solar', [-100])]), date)).toThrow('negativos');
+    expect(() => parseMix(widget([series('10296', 'Total', [100]), series('1458', 'Solar', [-100])]), date)).toThrow('no suman');
   });
   it('does not double-count storage totals and keeps negative exports and pumping', () => {
     const balance = parseBalance(balanceRaw(), date);
@@ -152,12 +152,102 @@ describe('replay, geography and API scope', () => {
     expect(url.searchParams.get('time_trunc')).toBe('day');
     expect(url.searchParams.get('end_date')).toBe(`${date}T23:59`);
   });
-  it('selects the mainland polygon, not islands, and checks the decorative dot mask', () => {
-    const mainland = [[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]];
-    const island = [[8, 8], [9, 8], [9, 9], [8, 9], [8, 8]];
-    const result = mainlandPolygon({ geometry: { type: 'MultiPolygon', coordinates: [[island], [mainland]] } });
-    expect(result).toEqual(mainland);
-    expect(insidePolygon(3, 3, result)).toBe(true);
-    expect(insidePolygon(8.5, 8.5, result)).toBe(false);
+});
+
+function historyRaw() {
+  const values = (numbers: number[]) => numbers.map((value, i) => ({
+    value, percentage: 999, datetime: new Date(midnight(shiftDate('2026-10-24', i))).toISOString(),
+  }));
+  const source = [
+    ['1458', 'Solar fotovoltaica', [50, 100, 150]],
+    ['1459', 'Solar térmica', [10, 20, 30]],
+    ['10291', 'Eólica', [200, 100, 50]],
+    ['10288', 'Hidráulica', [30, 40, 30]],
+    ['1446', 'Nuclear', [100, 100, 100]],
+    ['1454', 'Ciclo combinado', [40, 70, 90]],
+    ['1451', 'Turbina de vapor', [10, 10, 10]],
+    ['10296', 'Generación total', [440, 440, 460]],
+  ] as const;
+  return widget(source.map(([id, title, numbers]) => ({ id, attributes: { title, values: values([...numbers]) } })));
+}
+
+describe('actual daily technology evolution', () => {
+  it('keeps actual changing daily values, grouping and daily shares across the 25-hour day', () => {
+    const history = parseGenerationHistory(historyRaw(), '2026-10-24', '2026-10-26');
+    expect(history.days.map(day => day.mix?.groups.find(group => group.id === 'solar')?.value)).toEqual([60, 120, 180]);
+    expect(history.days.map(day => day.mix?.groups.find(group => group.id === 'wind')?.value)).toEqual([200, 100, 50]);
+    expect(history.days[1].mix?.total).toBe(440);
+    expect(history.days[1].mix?.groups.reduce((sum, group) => sum + group.share, 0)).toBeCloseTo(1);
+    expect(midnight('2026-10-26') - midnight('2026-10-25')).toBe(25 * HOUR);
+  });
+  it('trims unpublished outer days but preserves actual calendar gaps inside the series', () => {
+    const raw = historyRaw();
+    for (const item of raw.included) item.attributes.values.splice(1, 1);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const history = parseGenerationHistory(raw, '2026-10-23', '2026-10-27');
+    expect(history.days.map(day => day.date)).toEqual(['2026-10-24', '2026-10-25', '2026-10-26']);
+    expect(history.days[1].mix).toBeNull();
+    expect(history.unpublished).toEqual(['2026-10-23', '2026-10-27']);
+    log.mockRestore();
+  });
+  it('does not fill missing primary technologies, even when a changed total would close', () => {
+    const raw = historyRaw();
+    raw.included.find(item => item.id === '10291')!.attributes.values.splice(1, 1);
+    raw.included.find(item => item.id === '10296')!.attributes.values[1].value -= 100;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const history = parseGenerationHistory(raw, '2026-10-24', '2026-10-26');
+    expect(history.days[1].mix).toBeNull();
+    expect(history.days[1].error).toContain('principal sin dato');
+    log.mockRestore();
+  });
+  it('keeps an omitted minor component explicitly unreported, only if the published values still close', () => {
+    const raw = historyRaw();
+    raw.included.find(item => item.id === '1451')!.attributes.values.splice(1, 1);
+    raw.included.find(item => item.id === '10296')!.attributes.values[1].value -= 10;
+    const history = parseGenerationHistory(raw, '2026-10-24', '2026-10-26');
+    expect(history.days[1].unreported).toEqual(['Turbina de vapor']);
+    expect(history.days[1].mix?.groups.find(group => group.id === 'other')?.technologies).toEqual([]);
+    expect(history.days[1].mix?.total).toBe(430);
+  });
+  it('invalidates a bad daily sum without discarding the other days', () => {
+    const raw = historyRaw();
+    raw.included.find(item => item.id === '1458')!.attributes.values[1].value = -5;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(parseGenerationHistory(raw, '2026-10-24', '2026-10-26').days[1].error).toContain('no suman');
+    raw.included.find(item => item.id === '1458')!.attributes.values[1].value = 105;
+    expect(parseGenerationHistory(raw, '2026-10-24', '2026-10-26').days[1].error).toContain('no suman');
+    log.mockRestore();
+  });
+  it('preserves real signed components and negative group contributions when their total closes', () => {
+    const raw = historyRaw();
+    raw.included.find(item => item.id === '1458')!.attributes.values[1].value = -30;
+    raw.included.find(item => item.id === '10296')!.attributes.values[1].value -= 130;
+    const history = parseGenerationHistory(raw, '2026-10-24', '2026-10-26');
+    expect(history.days[1].mix?.groups.find(group => group.id === 'solar')).toMatchObject({ value: -10 });
+    expect(history.days[1].mix?.total).toBe(310);
+    expect(history.days[1].mix?.groups.reduce((sum, group) => sum + group.share, 0)).toBeCloseTo(1);
+  });
+  it('rejects non-daily timestamps, duplicates and a series with only one valid day', () => {
+    const raw = historyRaw();
+    raw.included[0].attributes.values[1].datetime = new Date(midnight('2026-10-25') + HOUR).toISOString();
+    expect(() => parseGenerationHistory(raw, '2026-10-24', '2026-10-26')).toThrow('resolución diaria');
+    const duplicate = historyRaw();
+    duplicate.included[0].attributes.values[1].datetime = duplicate.included[0].attributes.values[0].datetime;
+    expect(() => parseGenerationHistory(duplicate, '2026-10-24', '2026-10-26')).toThrow('duplicadas');
+    const single = historyRaw();
+    for (const item of single.included) item.attributes.values.splice(1);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => parseGenerationHistory(single, '2026-10-24', '2026-10-26')).toThrow('al menos dos días');
+    log.mockRestore();
+  });
+  it('requests one daily time range with explicit peninsular scope and selects discrete dates', () => {
+    const url = new URL(historyURL('2026-10-02', '2026-10-31'));
+    expect(url.searchParams.get('start_date')).toBe('2026-10-02T00:00');
+    expect(url.searchParams.get('end_date')).toBe('2026-10-31T23:59');
+    expect(url.searchParams.get('time_trunc')).toBe('day');
+    expect(url.searchParams.get('geo_ids')).toBe('8741');
+    expect(historyIndex(29, 0)).toBe(0);
+    expect(historyIndex(29, 0.5)).toBe(14);
+    expect(historyIndex(29, 1)).toBe(28);
   });
 });

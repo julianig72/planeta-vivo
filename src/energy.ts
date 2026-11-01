@@ -15,6 +15,20 @@ export interface Generation { updated: number; clean: Point[]; emitting: Point[]
 export interface Technology { id: string; title: string; value: number }
 export interface MixGroup { id: string; title: string; color: string; value: number; share: number; technologies: Technology[] }
 export interface Mix { updated: number; total: number; groups: MixGroup[] }
+export interface GenerationDate {
+  date: string;
+  mix: Mix | null;
+  error: string | null;
+  unreported: string[];
+}
+export interface GenerationHistory {
+  startDate: string;
+  endDate: string;
+  received: number;
+  updated: number;
+  days: GenerationDate[];
+  unpublished: string[];
+}
 export interface Balance {
   updated: number;
   demand: number;
@@ -167,11 +181,14 @@ const GROUPS = [
 export function parseMix(raw: unknown, date: string): Mix {
   const widget = parseWidget(raw);
   const total = daily(seriesByID(widget, '10296'), date);
-  if (total <= 0) throw new Error('La generación total diaria no es positiva.');
   const technologies = widget.series.filter(item => item.id !== '10296').map(item => ({
     id: item.id, title: item.title, value: daily(item, date),
   }));
-  if (technologies.some(item => item.value < 0)) throw new Error('El mix incluye valores negativos; no se pueden presentar como generación.');
+  return summarizeMix(widget.updated, total, technologies);
+}
+
+function summarizeMix(updated: number, total: number, technologies: Technology[]): Mix {
+  if (total <= 0) throw new Error('La generación total diaria no es positiva.');
   if (Math.abs(technologies.reduce((sum, item) => sum + item.value, 0) - total) > 2) {
     throw new Error('Las tecnologías no suman la generación total publicada.');
   }
@@ -181,7 +198,73 @@ export function parseMix(raw: unknown, date: string): Mix {
     const value = members.reduce((sum, item) => sum + item.value, 0);
     return { id: group.id, title: group.title, color: group.color, value, share: value / total, technologies: members };
   });
-  return { updated: widget.updated, total, groups };
+  return { updated, total, groups };
+}
+
+export function historyURL(startDate: string, endDate: string): string {
+  const url = new URL(widgetURL(WIDGETS.mix, startDate, 'day'));
+  url.searchParams.set('end_date', `${endDate}T23:59`);
+  return url.toString();
+}
+
+export function parseGenerationHistory(raw: unknown, startDate: string, endDate: string): GenerationHistory {
+  const widget = parseWidget(raw);
+  const dates: string[] = [];
+  for (let date = startDate; date <= endDate; date = shiftDate(date, 1)) {
+    dates.push(date);
+    if (dates.length > 31) throw new Error('El período debe tener como máximo 31 días.');
+  }
+  if (!dates.length) throw new Error('El período de generación está vacío.');
+  const allowed = new Set(dates.map(midnight));
+  if (widget.series.some(series => series.points.some(point => !allowed.has(point.time)))) {
+    throw new Error('La fuente incluye valores fuera del período o sin resolución diaria peninsular.');
+  }
+  const total = seriesByID(widget, '10296');
+  const required = GROUPS.flatMap(group => group.ids);
+  const days = dates.map((date): GenerationDate => {
+    const time = midnight(date);
+    const unreported = widget.series.filter(series => series.id !== '10296' && !series.points.some(point => point.time === time)).map(series => series.title);
+    try {
+      const point = total.points.find(point => point.time === time);
+      if (!point) throw new Error('Día sin generación total publicada.');
+      for (const id of required) {
+        if (!widget.series.find(series => series.id === id)?.points.some(point => point.time === time)) {
+          throw new Error(`Tecnología principal sin dato diario: ${id}.`);
+        }
+      }
+      const technologies = widget.series.filter(series => series.id !== '10296').flatMap(series => {
+        const value = series.points.find(point => point.time === time);
+        return value ? [{ id: series.id, title: series.title, value: value.value }] : [];
+      });
+      return { date, mix: summarizeMix(widget.updated, point.value, technologies), error: null, unreported };
+    } catch (error) {
+      const message = errorText(error);
+      console.error(`REData · generación diaria · ${date}`, message);
+      return { date, mix: null, error: message, unreported };
+    }
+  });
+  const first = days.findIndex(day => day.mix);
+  const last = days.reduce((last, day, index) => day.mix ? index : last, -1);
+  if (first < 0 || days.filter(day => day.mix).length < 2) {
+    throw new Error('REData no ofrece al menos dos días válidos para comparar generación.');
+  }
+  return {
+    startDate, endDate, updated: widget.updated, received: Date.now(),
+    days: days.slice(first, last + 1),
+    unpublished: [...days.slice(0, first), ...days.slice(last + 1)].map(day => day.date),
+  };
+}
+
+export async function fetchGenerationHistory(startDate?: string, endDate?: string): Promise<GenerationHistory> {
+  const end = endDate ?? shiftDate(madridDate(Date.now()), -1);
+  const start = startDate ?? shiftDate(end, -29);
+  const response = await fetch(historyURL(start, end), { signal: AbortSignal.timeout(22_000), cache: 'no-store' });
+  if (!response.ok) throw new Error(`REData · HTTP ${response.status} al consultar generación diaria.`);
+  return parseGenerationHistory(await response.json(), start, end);
+}
+
+export function historyIndex(count: number, progress: number): number {
+  return Math.min(count - 1, Math.max(0, Math.floor(progress * count)));
 }
 
 export function parseBalance(raw: unknown, date: string): Balance {
