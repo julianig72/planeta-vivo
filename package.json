@@ -4,16 +4,20 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "node server.mjs --dev",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "node server.mjs",
     "test": "vitest run src",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:server": "node --test tests/server.test.mjs",
+    "prepare:renfe": "node scripts/prepare-renfe.mjs"
   },
+  "dependencies": { "maplibre-gl": "^6.16.0" },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "fflate": "^0.8.3"
   }
 }
