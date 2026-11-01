@@ -1,71 +1,112 @@
-# Planeta vivo
+# España respira energía · Planeta vivo
 
-Una ventana cinematográfica a la Tierra: globo 3D con iluminación día/noche, terremotos recientes de USGS y una capa de previsión de auroras de NOAA. Interfaz en español, sin cuentas, claves ni backend.
+Una experiencia cinematográfica sobre la energía de **España peninsular**. Un mapa 3D reconocible respira con la demanda horaria; el anillo muestra la generación diaria solar, eólica, hidráulica, nuclear y demás tecnologías. Reproduce un día real en 30 segundos, con fecha y reloj visibles. No es un dashboard de red ni telemetría en tiempo real.
 
 ## Ejecutar
 
-Requiere Node.js 20.19+ o 22.12+ y npm.
+Node.js 20.19+ o 22.12+ y npm:
 
 ```sh
 npm install
 npm run dev
 ```
 
-Abre la dirección local que indica Vite. Para generar y servir la versión de producción:
+Producción y pruebas:
 
 ```sh
 npm run build
 npm run preview
+npm test
+npx playwright install chromium
+npm run test:e2e
 ```
 
-`npm test` ejecuta las pruebas de interpretación de datos, ventanas temporales y reloj de reproducción. Para la comprobación end-to-end, ejecuta `npx playwright install chromium`, `npm run build` y `npm run test:e2e`. Estas pruebas verifican las fuentes reales (requieren Internet), WebGL, selección, reproducción, tamaños de pantalla y errores independientes; un caso usa respuestas de prueba explícitas para vacío/antigüedad, nunca en la aplicación. Stack: Vite, TypeScript y Three.js. No se necesita configuración secreta.
+Las pruebas end-to-end usan las fuentes reales y necesitan Internet. También verifican fallos de actualización y observaciones ausentes mediante respuestas de prueba explícitas, nunca incorporadas a la aplicación. Stack: Vite, TypeScript y Three.js. Sin backend, claves, cuentas ni ESIOS.
 
-## Explorar y reproducir
+## Qué se ve y qué cambia
 
-- Arrastra el globo para girarlo y usa la rueda o un gesto de pinza para acercarte. Selecciona un punto o un evento de la lista: la cámara viaja a su ubicación y muestra magnitud, hora UTC, profundidad, coordenadas y enlace a USGS.
-- Los interruptores controlan las capas sin afectar a los datos de las otras. «Explorar el polo norte» orienta la cámara hacia la previsión.
-- «Ahora» muestra eventos **recientes**, no detección instantánea. El globo gira lentamente mientras no se interactúa con él.
-- «Últimas 24 horas» reproduce una instantánea real de USGS, cronológicamente, en **30 segundos**. Muestra el reloj histórico, permite pausar y desplazar la posición; al terminar se detiene. Pulsa reproducir para repetir o «Ahora» para volver a los últimos datos.
-- En reproducción se **oculta la capa de auroras**: una previsión actual no corresponde al pasado sísmico. La iluminación solar aproximada sigue el reloj de la escena.
-- Los pulsos son un recurso gráfico para destacar eventos; **no representan ondas sísmicas**, energía, alcance ni velocidad. Tamaño y color de puntos orientativos según magnitud. Las estrellas son decorativas.
-- La lista de eventos y los controles funcionan con teclado. Se respeta `prefers-reduced-motion` en giro automático, viajes de cámara y pulsos.
+- **Demanda de la hora:** potencia media equivalente, en GW. El valor corresponde al intervalo indicado, no a un instante. La curva utiliza escalones de horas reales; las cifras no se interpolan.
+- **Generación sin emisiones CO₂ eq. de la hora:** porcentaje de las series horarias clasificadas por Red Eléctrica. Incluye nuclear. **No significa porcentaje renovable**, ni emisiones de ciclo de vida.
+- **Mix por tecnología:** energía total del día en GWh y porcentaje sobre la generación diaria publicada. Solar agrupa fotovoltaica y térmica; «Otras» conserva y permite inspeccionar todas las tecnologías restantes disponibles.
+- **El anillo es diario y fijo.** No cambia al reproducir las horas. La API verificada no admite aquí `time_trunc=hour` para el mix por tecnología; no inventamos una curva de solar o eólica distribuyendo totales diarios.
+- El brillo del mapa refleja la demanda normalizada dentro de ese mismo día. Los colores y puntos son recursos gráficos agregados; **no son centrales, sensores, producción regional ni flujos entre ciudades**.
+- La luz y el botón «Ir al amanecer» usan una aproximación astronómica para Madrid (40,4° N, 3,7° O). No son mediciones solares, ni prueban producción fotovoltaica a esa hora.
 
-## Fuentes y semántica temporal
+Selecciona una tecnología en la leyenda o en su arco para ver componentes, energía diaria y porcentaje. Arrastra suavemente o acerca el mapa; «Vista de España» recupera la composición inicial. Se respeta `prefers-reduced-motion` en los efectos y el movimiento.
 
-### USGS
+## Reloj, fecha y disponibilidad
 
-[Documentación GeoJSON](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php) · [Feed de las últimas 24 horas](https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson).
+Buscamos el **día completo más reciente entre los tres días anteriores**, empezando por ayer en `Europe/Madrid`. Se comprueba que existan todas las horas de demanda y de generación con/sin emisiones, y el mix diario del mismo día. Si se elige un día anterior, el modal de fuentes explica los intentos y errores; no se oculta la elección.
 
-Consulta directa desde el navegador cada **60 segundos**, con un tiempo máximo de 20 segundos. El feed oficial se actualiza cada minuto. Usamos `metadata.generated`, y `properties.time`, `updated`, `mag`, `place`, `url` junto con `geometry.coordinates` (longitud, latitud, profundidad en km). Solo se incluyen registros de tipo `earthquake`. El número de registros excluidos por tipo o formato se muestra, no se disimula.
+La fecha y el retraso respecto al final de ese día aparecen en pantalla. **No se presenta como hoy ni como tiempo real.** El resumen abre a mitad del día; reproducir desde ese resumen reinicia a las 00:00 y recorre el día completo en 30 segundos. El final queda en pausa a las 24:00. Pausa, desliza el reloj, salta al amanecer o vuelve al resumen. Al ocultar la pestaña se pausa el avance efectivo.
 
-Los eventos pueden llegar con retraso o ser revisados. La ventana de «Ahora» se calcula respecto al reloj del equipo. La reproducción se fija a la generación del feed (o al reloj local si es anterior), no cambia con descargas posteriores, y excluye registros futuros. «M —» significa magnitud no facilitada, no magnitud cero.
+Si ninguno de los tres días tiene todas las capas principales, se usa el que conserva más capas reales válidas (y, en igualdad, el más reciente). Las capas ausentes permanecen identificadas como no disponibles. Así un fallo de demanda no destruye un mix diario válido de otro día; nunca se mezclan fechas entre capas.
 
-### NOAA SWPC / OVATION
+Los límites del día se calculan con la zona peninsular, incluyendo días de cambio de hora de **23 o 25 horas**. Se mantienen los offsets de las observaciones y se muestran CET/CEST en cada intervalo; las dos horas repetidas no se colapsan. Si faltan horas, la capa queda no disponible en lugar de rellenarse.
 
-[Producto Aurora 30-Minute Forecast](https://www.swpc.noaa.gov/products/aurora-30-minute-forecast) · [Cuadrícula JSON](https://services.swpc.noaa.gov/json/ovation_aurora_latest.json).
+«Actualizar fuentes» vuelve a consultar el mismo día y pausa la reproducción. Se mantienen fecha, ámbito y sincronización; si una capa falla, se conserva su última descarga válida identificada y se muestra el error. El modal distingue la hora del producto de la última descarga válida y del último intento de consulta. Un archivo de más de 72 horas se señala como antiguo. Para buscar el nuevo día más reciente, recarga la aplicación.
 
-Consulta directa cada **5 minutos**. Interpretamos `Observation Time` y `Forecast Time` en UTC y `coordinates` como `[longitud 0–359, latitud, probabilidad 0–100]`. La capa se dibuja desde esas celdas reales; no se generan auroras artificiales. La escala de color es una representación visual de probabilidad modelada, no de brillo observado.
+## REData: fuentes efectivas y resolución
 
-En la verificación inicial, ambos feeds devolvieron HTTP 200 con `Access-Control-Allow-Origin: *` y caché de 60 segundos. NOAA devolvió 65.160 celdas únicas (360 × 181), longitudes 0–359 y latitudes −90–90. La cadencia de consulta es nuestra decisión; no garantiza que haya datos nuevos en cada descarga.
+[Documentación oficial](https://www.ree.es/es/datos/apidatos). Servicio público de Red Eléctrica, distinto de ESIOS:
 
-OVATION ofrece una **previsión de corto plazo**, habitualmente 30–90 minutos según el viento solar. No es una observación de auroras ni una garantía de visibilidad desde el suelo, que también depende de luz, nubes y ubicación. Las horas de observación y previsión del producto aparecen en pantalla. No se sustituye el horizonte real por un «+30 min» fijo.
+```text
+GET https://apidatos.ree.es/{lang}/datos/{category}/{widget}
+    ?start_date=YYYY-MM-DDTHH:MM
+    &end_date=YYYY-MM-DDTHH:MM
+    &time_trunc=hour|day|month|year
+```
 
-NOAA advierte que, si no hay datos de viento solar válidos, puede usar Kp como entrada y no ofrecer tiempo de anticipación. Por eso se aceptan horas de observación y previsión iguales y se muestran tal como llegan.
+Filtros geográficos opcionales de la API: `geo_trunc`, `geo_limit`, `geo_ids`. En esta aplicación se envían **siempre explícitamente**:
 
-### Errores y antigüedad
+```text
+lang=es
+geo_trunc=electric_system
+geo_limit=peninsular
+geo_ids=8741
+```
 
-La red puede fallar y las fuentes pueden no estar disponibles o impedir CORS. Cada capa informa de su error y permite reintentar independientemente. Si hay una descarga anterior, se conserva **identificada**; si no hay datos, la capa no se inventa. Un feed válido sin eventos se muestra como vacío.
+| Widget verificado | Resolución utilizada | Contenido |
+| --- | --- | --- |
+| `demanda/evolucion` | `hour` | Demanda, indicador `10297` |
+| `generacion/evolucion-estructura-generacion-emisiones-asociadas` | `hour` | Generación sin/con CO₂ eq., indicadores `1` y `2` |
+| `generacion/estructura-generacion` | `day` | Tecnologías y generación total `10296` |
+| `balance/balance-electrico` | `day` | Renovables, no renovables, almacenamiento, intercambios y demanda |
 
-USGS se marca antiguo a los **15 minutos** desde generación. NOAA se marca antiguo a los **45 minutos** desde observación o cuando su hora de previsión ya ha vencido. El modal «Fuentes y actualización» distingue generación, descarga, observación y previsión. El reloj del equipo debe ser correcto.
+Ejemplo efectivo:
 
-## Imágenes, atribución y licencias
+```text
+https://apidatos.ree.es/es/datos/balance/balance-electrico?start_date=2026-10-30T00:00&end_date=2026-10-30T23:59&time_trunc=day&geo_trunc=electric_system&geo_limit=peninsular&geo_ids=8741
+```
 
-Las texturas estáticas de la Tierra son imágenes NASA distribuidas en los [ejemplos de Three.js](https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets): `earth_atmos_2048.jpg` y `earth_lights_2048.png`, guardadas localmente en `public/textures`. **No son imágenes de satélite en directo**. La luz solar se calcula aproximadamente a partir de fecha y hora UTC; no pretende precisión de efemérides.
+En la verificación del 30/10/2026 hubo 24 observaciones horarias completas. Demanda horaria sumada: **642.367,2 MWh**. Generación horaria con/sin emisiones sumada: **700.633,9 MWh**, igual al mix diario publicado. Estas comprobaciones establecen la correspondencia energética: MWh por intervalo horario equivale numéricamente a MW medios durante esa hora; dividimos entre 1.000 para GW. Los agregados diarios se convierten de MWh a GWh, no se suman potencias como si fueran energías.
 
-- USGS: datos públicos del Gobierno de EE. UU.; [política de copyright](https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits).
-- NOAA: producto público del Gobierno de EE. UU.; [disclaimer y condiciones](https://www.noaa.gov/disclaimer). La atribución no implica respaldo de NOAA o USGS.
-- Imágenes NASA: [directrices de uso de medios](https://www.nasa.gov/nasa-brand-center/images-and-media/); sin logos ni respaldo institucional.
-- Three.js: MIT. Vite: MIT. TypeScript: Apache-2.0. Vitest: MIT. Sus avisos se mantienen en las dependencias.
-- Fuentes DM Sans y Manrope: SIL Open Font License, obtenidas de Google Fonts; si no están disponibles se utilizan fuentes del sistema.
+El navegador pudo consultar las fuentes directamente mediante CORS. La API documenta **GET**; no se asume que HEAD u otras operaciones estén permitidas. Se consultan bajo demanda con un máximo de 22 segundos por widget. `estructura-generacion`, `balance-electrico` y otros widgets diarios probados devolvieron HTTP 400 con `hour`; no se da por hecho que todos admitan todas las resoluciones enumeradas por la API.
 
-La aplicación no recopila telemetría propia. El navegador contacta las fuentes públicas y Google Fonts. No hay datos sintéticos de sustitución, credenciales ni servicios de pago.
+Las respuestas pueden contener `magnitude: null`; por eso las unidades no se deducen de ese campo ni de un porcentaje aislado. Se valida la resolución, los sumatorios horarios frente al día, los tipos y las horas. Los `percentage` de la fuente pueden referirse a subgrupos (especialmente en balance); **no se suman**. El mix se calcula usando los valores de las tecnologías y el total diario verificado.
+
+## Balance, almacenamiento y signos
+
+El balance observado se cumple como:
+
+```text
+generación renovable + generación no renovable
++ saldo almacenamiento + saldo internacional + enlace Península–Baleares
+= demanda en barras de central
+```
+
+El total del mix tecnológico **excluye almacenamiento** en este producto. La turbinación de bombeo (`1445`) es positiva y el consumo de bombeo (`1472`) negativo; su suma es el saldo (`10483`). No se cuenta a la vez una categoría total y sus componentes. No se etiqueta la turbinación como renovable ni se mete el consumo negativo en un gráfico de porcentajes de generación.
+
+Saldo internacional (`1474`) y enlace Península–Baleares (`1473`): positivo aporta al sistema peninsular; negativo sale de él. No se confunden saldo neto y flujos brutos. Los mostramos separados en el modal, sin atribuir al mix de Baleares el agregado peninsular ni simular rutas geográficas.
+
+Se comprueba el cierre de balance, la suma de tecnologías y la correspondencia entre capas. Tolerancia de redondeo: 2 MWh. Un desacuerdo invalida visiblemente la capa afectada, no se fuerza la suma ni se cambia el signo.
+
+## Ámbito e imágenes
+
+El mapa representa **España peninsular**; Portugal es contexto geográfico, sin datos eléctricos portugueses. Canarias, Baleares, Ceuta y Melilla **no forman parte del agregado**. No hay supuestas centrales, flujos entre ciudades, series autonómicas ni mediciones locales.
+
+Contornos: **Made with Natural Earth**, dominio público, escala 1:110 millones. [Condiciones](https://www.naturalearthdata.com/about/terms-of-use/) · [archivo vectorial de origen](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson). Los archivos locales en `public/maps` conservan las geometrías de España y Portugal; para la vista se selecciona el mayor polígono continental. La extrusión es decorativa, no elevación real.
+
+Los datos energéticos se atribuyen a Red Eléctrica/REData; su publicación en esta demo no implica respaldo institucional. Three.js, Vite y Vitest: MIT; TypeScript: Apache-2.0; Playwright: Apache-2.0. Los avisos se mantienen en las dependencias. DM Sans y Manrope: SIL Open Font License; si Google Fonts no está disponible se usa la tipografía del sistema.
+
+La aplicación no recoge telemetría propia. El navegador contacta REData y Google Fonts. No hay claves, servicios de pago ni datos sintéticos de sustitución.
