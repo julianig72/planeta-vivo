@@ -10,6 +10,7 @@ header button,header select,header a { pointer-events:auto; }
 .brand-light { font-weight:400; color:var(--mint); } .brand small { display:block; color:#89a8b5; font:6px 'DM Sans',sans-serif; letter-spacing:2px; margin-top:6px; } .brand svg { width:35px; height:35px; fill:none; stroke:var(--mint); stroke-width:1.4; }
 .header-controls { display:flex; align-items:center; gap:14px; } .network-label { font-size:6px; letter-spacing:1.5px; color:#82a1b1; display:flex; flex-direction:column; gap:5px; }
 select { background:#0a1b23ed; border:1px solid var(--border); border-radius:5px; padding:8px 10px; width:207px; font-size:11px; letter-spacing:0; } select option { background:#0b1a23; }
+#service { width:180px; }
 .round { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); color:#b6d1d7; background:#0a1925ba; font-size:16px; padding:0; } .info { font:italic 16px Georgia,serif; }
 .hero { position:absolute; top:147px; left:40px; width:325px; pointer-events:none; } .eyebrow { font-size:7px; letter-spacing:1.7px; color:var(--mint); margin:0 0 17px; }
 h1 { margin:0; font:500 50px/1.06 'Manrope',sans-serif; letter-spacing:-2.6px; } h1 em { font-family:Georgia,serif; font-weight:400; color:var(--gold); letter-spacing:-2.1px; }
@@ -48,6 +49,8 @@ dialog h3 { color:var(--mint); font-size:13px; font-weight:500; margin:23px 0 8p
 .map-unavailable .train-list-panel,.map-unavailable aside { display:block!important; }
 @media(min-width:1001px) and (max-height:800px) { .hero { top:125px; } h1 { font-size:44px; } .intro { margin:17px 0 20px; font-size:10px; } .metric strong { font-size:44px; } .connection { margin-top:18px; } aside { top:122px; } #train-list { max-height:225px; } #train-detail { padding:14px; margin-bottom:15px; } .notice { max-height:74px; } }
 @media(max-width:1100px) and (min-width:701px) { header { padding:25px; } .brand { font-size:19px; } .brand small { letter-spacing:1px; } .hero { left:26px; width:280px; } h1 { font-size:44px; } aside { right:25px; width:230px; } .map-controls { left:26px; right:25px; } footer { left:25px; right:25px; } select { width:178px; } .header-controls { gap:10px; } }
+@media(max-width:1100px) and (min-width:701px) { #service { width:145px; } }
+@media(max-width:820px) and (min-width:701px) { header { display:block; } .header-controls { margin-top:14px; justify-content:flex-end; } }
 @media(max-width:1000px) and (min-width:701px) { .train-list-panel { display:none; } aside { top:auto; max-height:400px; } }
 @media(max-width:700px) { #app { min-height:850px; } header { padding:20px; display:block; } .brand { font-size:19px; gap:10px; } .brand svg { width:28px; height:28px; } .brand small { font-size:5px; letter-spacing:1px; } .header-controls { margin-top:18px; gap:12px; } .network-label { flex:1; } select { width:100%; font-size:10px; } .hero { top:166px; left:22px; width:240px; } .hero .eyebrow { font-size:5px; margin-bottom:11px; } h1 { font-size:32px; letter-spacing:-1.6px; } .intro { display:none; } .metric { position:absolute; left:256px; top:23px; width:70px; } .metric strong { font-size:30px; } .metric>span { font-size:5px; line-height:1.8; letter-spacing:.3px; } .connection { margin-top:17px; font-size:5px; letter-spacing:.8px; } .notice { max-height:45px; font-size:7px; max-width:324px; }
   .vignette { background:linear-gradient(0deg,#07131bec,transparent 35%,transparent 56%,#07131bd9 80%); }
@@ -55,4 +58,11 @@ dialog h3 { color:var(--mint); font-size:13px; font-weight:500; margin:23px 0 8p
   .map-controls { left:22px; right:22px; bottom:111px; gap:10px; } #fit { font-size:8px; } #view-label { display:none; } footer { height:88px; left:22px; right:22px; gap:8px; flex-wrap:wrap; padding:10px 0; } footer>div>span { font-size:5px; letter-spacing:.4px; } footer strong { font-size:10px; margin-top:4px; } footer .source-clock span { font-size:6px; } footer button { width:100%; text-align:left; font-size:6px; } footer small { display:inline; margin-left:6px; font-size:5px; } .maplibregl-ctrl-bottom-right { bottom:145px!important; } .maplibregl-ctrl-attrib { font-size:7px!important; } #empty-state { left:22px; right:22px; top:48%; font-size:11px; }
   .clean .hero { bottom:170px; top:auto; } .clean .hero .metric { position:static; width:auto; } .clean .hero .eyebrow { display:none; } .clean .connection { margin-top:8px; } dialog { padding:26px; } dialog h2 { font-size:25px; }
   .map-unavailable aside { top:330px; bottom:157px; max-height:none; } .map-unavailable.clean .hero { top:166px; bottom:auto; }
+  #app { min-height:900px; }
+  .header-controls { display:grid; grid-template-columns:1fr 30px 30px 30px; gap:10px; }
+  .header-controls .network-label:first-child { grid-column:1 / -1; }
+  #service { width:100%; }
+  .hero { top:210px; }
+  .notice { max-height:65px; width:324px; }
+  .map-unavailable aside { top:390px; }
 }

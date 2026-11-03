@@ -5,18 +5,19 @@ import { gzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
 
 export const FEED = 'https://gtfsrt.renfe.com/vehicle_positions.json';
-export function createFeedCache(transport = fetch, now = Date.now) {
+export const HIGH_SPEED_FEED = 'https://gtfsrt.renfe.com/vehicle_positions_LD.json';
+export function createFeedCache(transport = fetch, now = Date.now, source = FEED, cadence = 20_000) {
   let attempted = -Infinity, cached = null, failure = null, pending = null;
   return async function getFeed() {
     if (pending) return pending;
-    if (now() - attempted < 20_000) {
+    if (now() - attempted < cadence) {
       if (failure) throw failure;
       return cached;
     }
     attempted = now();
     pending = (async () => {
       try {
-        const response = await transport(FEED, { signal: AbortSignal.timeout(12_000), headers: { Accept: 'application/json' } });
+        const response = await transport(source, { signal: AbortSignal.timeout(12_000), headers: { Accept: 'application/json' } });
         if (!response.ok) throw new Error(`Renfe HTTP ${response.status}`);
         const feed = await response.json();
         if (!feed.header || feed.entity !== undefined && !Array.isArray(feed.entity)) throw new Error('Formato GTFS-RT inesperado.');
@@ -38,7 +39,9 @@ async function start() {
   const port = portAt >= 0 ? Number(process.argv[portAt + 1]) : dev ? 5173 : 4173;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Puerto inválido.');
   const trips = JSON.parse(await readFile(resolve('data', 'renfe-trips.json'), 'utf8'));
+  const highSpeedTrips = JSON.parse(await readFile(resolve('data', 'renfe-high-speed-trips.json'), 'utf8'));
   const getFeed = createFeedCache();
+  const getHighSpeed = createFeedCache(fetch, Date.now, HIGH_SPEED_FEED, 15_000);
   const vite = dev ? await (await import('vite')).createServer({ server: { middlewareMode: true }, appType: 'spa' }) : null;
   const root = resolve('dist');
   const mime = { '.html': 'text/html', '.js': 'application/javascript', '.mjs': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
@@ -46,12 +49,14 @@ async function start() {
     try {
       if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end('GET/HEAD only'); return; }
       const path = new URL(req.url, 'http://localhost').pathname;
-      if (path === '/api/positions') {
+      if (path === '/api/positions' || path === '/api/high-speed/positions') {
         try {
-          const snapshot = await getFeed(), matches = {};
+          const highSpeed = path === '/api/high-speed/positions';
+          const index = highSpeed ? highSpeedTrips : trips;
+          const snapshot = await (highSpeed ? getHighSpeed() : getFeed()), matches = {};
           for (const entity of snapshot.feed.entity) {
             const id = entity?.vehicle?.trip?.tripId;
-            if (typeof id === 'string' && Object.hasOwn(trips, id)) matches[id] = trips[id];
+            if (typeof id === 'string' && Object.hasOwn(index, id)) matches[id] = index[id];
           }
           const bytes = Buffer.from(JSON.stringify({ ...snapshot, matches }));
           res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });

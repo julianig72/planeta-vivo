@@ -13,7 +13,8 @@ export interface Train {
   observed: number | null; status: string; stopId: string; platform: string | null;
   route: Route | null; shapeId: string | null; network: string;
 }
-export interface Snapshot { timestamp: number; receivedAt: number; trains: Train[]; excluded: number }
+export interface Snapshot { timestamp: number; receivedAt: number; trains: Train[]; excluded: number; filtered: number }
+export const HIGH_SPEED_NETWORKS = new Set(['av-AVE', 'av-AVLO', 'av-AVANT', 'av-AVE INT', 'av-AVANT EXP']);
 export const POLL = 20_000, FEED_OLD = 90_000, TRAIN_OLD = 120_000;
 export function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 function unix(value: unknown): number | null {
@@ -34,7 +35,7 @@ export function isRailData(value: unknown): value is RailData {
     record(value.stops) && Object.values(value.stops).every(s => record(s) && typeof s.id === 'string' && typeof s.name === 'string' && coordinates(s.coordinates)) &&
     Array.isArray(value.lines) && value.lines.every(l => record(l) && ['shapeId', 'network', 'line', 'color'].every(k => typeof l[k] === 'string'));
 }
-export function parseSnapshot(raw: unknown, rail: RailData | null, now = Date.now()): Snapshot {
+export function parseSnapshot(raw: unknown, rail: RailData | null, now = Date.now(), allowedNetworks?: ReadonlySet<string>): Snapshot {
   if (!record(raw) || !record(raw.feed) || !record(raw.feed.header) || typeof raw.receivedAt !== 'number' ||
       !Number.isFinite(raw.receivedAt) || raw.receivedAt <= 0 || raw.receivedAt > now + 60_000) throw new Error('Respuesta del servidor incompleta.');
   const feed = raw.feed, header = raw.feed.header;
@@ -48,11 +49,10 @@ export function parseSnapshot(raw: unknown, rail: RailData | null, now = Date.no
   if (!Array.isArray(entities)) throw new Error('Lista de vehículos GTFS-RT inválida.');
   const matches = record(raw.matches) ? raw.matches : {};
   const seen = new Set<string>(), trains: Train[] = [];
-  let excluded = 0;
+  let excluded = 0, filtered = 0;
   for (const entity of entities) {
     if (record(entity) && entity.isDeleted === true) continue;
-    if (!record(entity) || typeof entity.id !== 'string' || !record(entity.vehicle) || seen.has(entity.id)) { excluded++; continue; }
-    seen.add(entity.id);
+    if (!record(entity) || typeof entity.id !== 'string' || !record(entity.vehicle)) { excluded++; continue; }
     const vehicle = entity.vehicle, p = vehicle.position;
     if (!record(p) || typeof p.longitude !== 'number' || typeof p.latitude !== 'number' ||
       !coordinates([p.longitude, p.latitude]) || p.longitude < -10 || p.longitude > 5 || p.latitude < 35 || p.latitude > 44.5) { excluded++; continue; }
@@ -60,7 +60,10 @@ export function parseSnapshot(raw: unknown, rail: RailData | null, now = Date.no
     const match = Object.hasOwn(matches, tripId) ? matches[tripId] : null;
     const routeId = Array.isArray(match) && typeof match[0] === 'string' ? match[0] : null;
     const route = routeId && rail && Object.hasOwn(rail.routes, routeId) ? rail.routes[routeId] : null;
+    if (allowedNetworks && (!route || !allowedNetworks.has(route.network))) { filtered++; continue; }
     if (route && route.mode === 3) { excluded++; continue; }
+    if (seen.has(entity.id)) { excluded++; continue; }
+    seen.add(entity.id);
     const shapeId = Array.isArray(match) && typeof match[1] === 'string' && rail && Object.hasOwn(rail.shapes, match[1]) ? match[1] : null;
     const descriptor = record(vehicle.vehicle) ? vehicle.vehicle : {};
     const label = typeof descriptor.label === 'string' ? descriptor.label : entity.id;
@@ -76,7 +79,7 @@ export function parseSnapshot(raw: unknown, rail: RailData | null, now = Date.no
       platform: label.match(/-PLATF\.\(([^)]+)\)/)?.[1] ?? null,
       route, shapeId, network: route?.network ?? 'unlinked' });
   }
-  return { timestamp, receivedAt: raw.receivedAt, trains, excluded };
+  return { timestamp, receivedAt: raw.receivedAt, trains, excluded, filtered };
 }
 export function fresh(train: Train, snapshot: Snapshot, now = Date.now()): boolean {
   return now - snapshot.timestamp < FEED_OLD && train.observed !== null && now - train.observed < TRAIN_OLD;

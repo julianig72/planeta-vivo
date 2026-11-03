@@ -51,7 +51,7 @@ export class TrainMap {
       })
       .catch(error => { console.error('Mapa base', error); warning('Mapa base no disponible. Se muestran posiciones y trazados reales sobre fondo neutro.'); });
   }
-  setRail(rail: RailData): void { this.rail = rail; if (this.ready) this.layers(); }
+  setRail(rail: RailData | null): void { this.rail = rail; if (this.ready) this.layers(); }
   private source(name: string, data: FeatureCollection): void {
     const existing = this.map.getSource<GeoJSONSource>(name);
     if (existing) existing.setData(data); else this.map.addSource(name, { type: 'geojson', data });
@@ -115,19 +115,22 @@ export class TrainMap {
     if (active && this.selected) {
       const width = this.map.getContainer().clientWidth;
       this.map.easeTo({ center: this.selected.coordinates, zoom: Math.max(12, this.map.getZoom()), pitch: 40, duration: 1000,
-        padding: width < 700 ? { top: 230, bottom: 230, left: 35, right: 35 } :
+        padding: width < 700 ? { top: 270, bottom: 230, left: 35, right: 35 } :
           { top: 130, bottom: 100, left: width < 1100 ? 320 : 370, right: width < 1100 ? 270 : 330 } });
     }
   }
   fit(trains: Train[], clean: boolean): void {
     this.following = false;
-    const points = trains.length ? trains.map(train => train.coordinates) : (this.rail?.lines.filter(line => line.network === this.network)
+    let points = trains.length ? trains.map(train => train.coordinates) : (this.rail?.lines.filter(line => line.network === this.network)
       .flatMap(line => this.rail?.shapes[line.shapeId] ?? []) ?? []);
+    if (!points.length && (this.network === 'all-av' || this.network.startsWith('av-'))) {
+      points = [[-9.5, 35.8], [3.3, 43.8]];
+    }
     if (!points.length) return;
     const bounds = new maplibregl.LngLatBounds(points[0], points[0]);
     for (const point of points) bounds.extend(point);
     const width = this.map.getContainer().clientWidth, mobile = width < 700;
-    this.map.fitBounds(bounds, { maxZoom: 12, duration: 900, padding: mobile ? { top: 230, bottom: 230, left: 35, right: 35 } :
+    this.map.fitBounds(bounds, { maxZoom: 12, duration: 900, padding: mobile ? { top: 270, bottom: 230, left: 35, right: 35 } :
       { top: 130, bottom: 100, left: clean ? 75 : width < 1100 ? 320 : 370, right: clean ? 75 : width <= 1000 ? 40 : width < 1100 ? 270 : 330 } });
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSnapshot, isRailData, fresh, canBlend, blend, distance, lineName, statusName, type RailData } from './trains-data';
+import { parseSnapshot, isRailData, fresh, canBlend, blend, distance, lineName, statusName, HIGH_SPEED_NETWORKS, type RailData } from './trains-data';
 
 const now = Date.now(), second = Math.floor(now / 1000);
 const rail: RailData = {
@@ -102,4 +102,36 @@ it('valida metadata, coordenadas y tipos del GTFS preparado', () => {
   expect(isRailData({ ...rail, metadata: { ...rail.metadata, preparedAt: 'invalid' } })).toBe(false);
   expect(isRailData({ ...rail, shapes: { bad: [[999, 40]] } })).toBe(false);
   expect(isRailData({ ...rail, routes: { bad: { ...rail.routes.madrid, mode: 'rail' } } })).toBe(false);
+});
+
+describe('alta velocidad: clasificación exacta y hora GPS no inventada', () => {
+  const avRail: RailData = { ...rail, shapes: {}, lines: [], routes: {
+    ave: { ...rail.routes.madrid, id: 'ave', line: 'AVE', network: 'av-AVE' },
+    md: { ...rail.routes.sevilla, id: 'md', line: 'MD', network: 'av-MD' },
+    avlo: { ...rail.routes.madrid, id: 'avlo', line: 'AVLO', network: 'av-AVLO' },
+  } };
+  const matches = { a: ['ave', ''], b: ['md', ''], c: ['avlo', ''] };
+  it('solo incluye productos verificados por tripId y no adivina por etiqueta o número', () => {
+    const md = vehicle('b', 'b'); md.vehicle.vehicle.label = 'AVE-12345';
+    const snapshot = parseSnapshot({ ...raw([vehicle(), md, vehicle('c', 'c'), vehicle('x', 'unknown')]), matches },
+      avRail, now, HIGH_SPEED_NETWORKS);
+    expect(snapshot.trains.map(lineName)).toEqual(['AVE', 'AVLO']);
+    expect(snapshot.filtered).toBe(2); expect(snapshot.excluded).toBe(0);
+    expect(snapshot.trains.every(train => train.shapeId === null)).toBe(true);
+  });
+  it('sin timestamp de vehículo mantiene observado=null, no copia el header ni interpola', () => {
+    const first = vehicle(), { timestamp: _time, ...withoutTime } = first.vehicle;
+    const snapshot = parseSnapshot({ ...raw([{ id: first.id, vehicle: withoutTime }]), matches }, avRail, now, HIGH_SPEED_NETWORKS);
+    const train = snapshot.trains[0];
+    expect(train.observed).toBeNull(); expect(fresh(train, snapshot, now)).toBe(false);
+    expect(canBlend(train, { ...train, coordinates: [-3.71, 40.41] })).toBe(false);
+  });
+  it('sin GTFS no etiqueta un GPS desconocido como alta velocidad', () => {
+    const snapshot = parseSnapshot({ ...raw(), matches }, null, now, HIGH_SPEED_NETWORKS);
+    expect(snapshot.trains).toEqual([]); expect(snapshot.filtered).toBe(1);
+  });
+  it('no cuenta dos veces un identificador repetido en distintos tramos', () => {
+    const snapshot = parseSnapshot({ ...raw([vehicle('a', 'a'), vehicle('a', 'c')]), matches }, avRail, now, HIGH_SPEED_NETWORKS);
+    expect(snapshot.trains).toHaveLength(1); expect(snapshot.excluded).toBe(1);
+  });
 });

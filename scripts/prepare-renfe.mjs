@@ -2,27 +2,13 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { unzipSync } from 'fflate';
+import { csv } from './gtfs-csv.mjs';
 
 export const SOURCE = 'https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip';
 const names = { '10': 'Madrid', '20': 'Asturias', '30': 'Sevilla', '31': 'Cádiz', '32': 'Málaga',
   '40': 'Valencia', '41': 'Murcia / Alicante', '45': 'Cartagena', '46': 'Ferrol',
   '47': 'León', '51': 'Rodalies de Catalunya', '60': 'Bilbao', '61': 'San Sebastián', '62': 'Cantabria', '70': 'Zaragoza' };
 
-function csv(text) {
-  const rows = []; let row = [], value = '', quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') { if (quoted && text[i + 1] === '"') { value += '"'; i++; } else quoted = !quoted; }
-    else if (!quoted && (c === ',' || c === '\n')) {
-      row.push(value.trim()); value = '';
-      if (c === '\n') { if (row.some(Boolean)) rows.push(row); row = []; }
-    } else if (c !== '\r') value += c;
-  }
-  if (quoted) throw new Error('CSV GTFS incompleto.');
-  if (value || row.length) { row.push(value.trim()); rows.push(row); }
-  const header = rows.shift();
-  return rows.map(row => Object.fromEntries(header.map((key, i) => [key, row[i] ?? ''])));
-}
 const file = process.argv[2];
 let bytes;
 if (file) bytes = await readFile(file);

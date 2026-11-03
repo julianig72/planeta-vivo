@@ -10,7 +10,8 @@
     "test": "vitest run src",
     "test:e2e": "playwright test",
     "test:server": "node --test tests/server.test.mjs",
-    "prepare:renfe": "node scripts/prepare-renfe.mjs"
+    "prepare:renfe": "node scripts/prepare-renfe.mjs",
+    "prepare:high-speed": "node scripts/prepare-high-speed.mjs"
   },
   "dependencies": { "maplibre-gl": "^6.16.0" },
   "devDependencies": {
