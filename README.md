@@ -42,7 +42,7 @@ Comprobación de fuentes del **3 de noviembre de 2026**:
 | Adif | Las páginas oficiales de datos abiertos e información al viajero consultadas devolvieron **HTTP 403**. No se eludió el bloqueo ni se verificó un recurso reutilizable de GPS/licencia; **no se incorporan datos Adif**. Esto no afirma que no exista otro servicio suyo. |
 | Otras operadoras | No se ha verificado una fuente de iryo u Ouigo; no se añaden ni se les atribuyen posiciones de Renfe. |
 
-En alta velocidad el contador dice **«posiciones en el feed reciente»**, no «GPS recientes». El reloj está identificado como **hora del feed, no GPS individual** y se indica cuántos puntos carecen de hora propia. Su antigüedad individual es desconocida: un header reciente no certifica que cada punto lo sea. Los colores por producto son una **paleta visual propia**, no colores medidos ni los colores de ruta blancos del GTFS.
+En alta velocidad el contador principal y el selector de producto cuentan las **posiciones publicadas en el mapa**, incluidas las antiguas o conservadas tras un error. El aviso indica por separado cuántas pertenecen a un feed reciente; un contador de recientes a cero no significa que el mapa esté vacío. Las antiguas mantienen puntos grises de alto contraste, sin seguimiento. El reloj está identificado como **hora del feed, no GPS individual** y se indica cuántos puntos carecen de hora propia. Su antigüedad individual es desconocida: un header reciente no certifica que cada punto lo sea. Los colores por producto son una **paleta visual propia**, no colores medidos ni los colores de ruta blancos del GTFS.
 
 La selección muestra marca, número de tren, estado y estación enlazados, con «No publicada» / «Hora propia no publicada» cuando corresponda. El seguimiento mueve la cámara hacia coordenadas realmente recibidas, **sin interpolación de puntos AV ni extrapolación por horarios**. No se estiman posiciones. Las entidades repetidas por varios tramos de un mismo identificador se cuentan una sola vez. Un punto fuera del ámbito peninsular se omite aunque el producto sea internacional.
 
@@ -121,6 +121,8 @@ npm run preview
 ```
 
 Genera `public\rail\high-speed.json` y `data\renfe-high-speed-trips.json`. Conserva URL, fecha, licencia y SHA-256; no crea shapes. Ambos conjuntos preparados se incluyen en el repositorio.
+
+Los `trip_id` AV/LD incluyen la fecha del viaje. Un índice de días anteriores puede dejar gran parte del feed sin enlace aunque tenga menos de siete días: si faltan trenes, regenerar el GTFS AV/LD y reiniciar el servidor antes de interpretar el vacío como ausencia de servicio. El 9 de noviembre de 2026 la regeneración elevó los enlaces exactos de una descarga de 28 a 192 de 193 registros AV/LD; solo los productos AV verificados se representan en esta vista. La fuente seguía publicando un reloj del feed aproximadamente una hora atrasado: se conserva y se advierte, sin corregirlo por conjeturas.
 
 ## Errores y límites
 

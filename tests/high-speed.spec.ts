@@ -38,7 +38,7 @@ test('AV real: productos enlazados, reloj del feed, selección y actualizaciones
   });
   await page.goto('/'); await page.locator('#service').selectOption('avld');
   await expect(page.locator('#train-count')).not.toHaveText('—', { timeout: 75_000 });
-  await expect(page.locator('#count-label')).toContainText('FEED RECIENTE');
+  await expect(page.locator('#count-label')).toHaveText('POSICIONES PUBLICADAS EN EL MAPA');
   await expect(page.locator('#view-state')).toContainText('NO ES LA HORA GPS');
   await expect(page.locator('#notice')).toContainText('sin hora GPS individual');
   await expect(page.locator('#live-dot')).not.toHaveClass(/live/);
@@ -88,6 +88,27 @@ test('AV real: productos enlazados, reloj del feed, selección y actualizaciones
   expect(errors).toEqual([]);
 });
 
+test('AV antigua: posiciones visibles y contadas sin presentarlas como recientes', async ({ page }) => {
+  const payload = fixture(Date.now() - 3_600_000);
+  payload.receivedAt = Date.now();
+  await page.route('**/api/positions', route => route.fulfill({ json: emptyCercanias() }));
+  await page.route('**/api/high-speed/positions', route => route.fulfill({ json: payload }));
+  await page.goto('/'); await page.locator('#service').selectOption('avld');
+  await expect(page.locator('#train-count')).toHaveText('1');
+  await expect(page.locator('#count-label')).toHaveText('POSICIONES PUBLICADAS EN EL MAPA');
+  await expect(page.locator('#connection')).toContainText('FEED ANTIGUO');
+  await expect(page.locator('#notice')).toContainText('0/1 posiciones en un feed reciente');
+  await expect(page.locator('#network option:checked')).toContainText('· 1');
+  await expect(page.locator('.train-row')).toHaveCount(1);
+  await expect(page.locator('.train-row')).toHaveClass(/old/);
+  await page.locator('.train-row').click();
+  await expect(page.locator('#detail-time')).toHaveText('No publicada');
+  await expect(page.locator('#follow')).toBeDisabled();
+  await page.locator('#network').selectOption(`av-${rail.routes[baseline.matches[example.vehicle.trip.tripId][0]].line}`);
+  await expect(page.locator('#train-count')).toHaveText('1');
+  await expect(page.locator('.train-row')).toHaveCount(1);
+});
+
 test('AV controlada: error, recuperación y desaparición no se sustituyen por Cercanías', async ({ page }) => {
   await page.clock.install({ time: new Date() });
   let payload = fixture(await page.evaluate(() => Date.now())), failed = false;
@@ -100,7 +121,8 @@ test('AV controlada: error, recuperación y desaparición no se sustituyen por C
   await expect(page.locator('#follow')).toHaveAttribute('aria-pressed', 'true');
   failed = true; await page.clock.fastForward(16_000);
   await expect(page.locator('#connection')).toContainText('INTERRUMPIDA');
-  await expect(page.locator('#train-count')).toHaveText('0');
+  await expect(page.locator('#train-count')).toHaveText('1');
+  await expect(page.locator('#notice')).toContainText('0/1 posiciones en un feed reciente');
   await expect(page.locator('#follow')).toBeDisabled();
   failed = false; payload = fixture(await page.evaluate(() => Date.now()));
   await page.clock.fastForward(16_000);

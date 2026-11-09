@@ -136,22 +136,22 @@ function renderUI(): void {
   el('intro').innerHTML = service === 'avld' ? 'AVE, AVLO y Avant publicados por Renfe.<br>Posiciones del feed. Hora GPS no publicada.' :
     'Cada punto es una posición publicada.<br>Cada línea, un trazado del GTFS de Renfe.';
   el('panel-label').textContent = service === 'avld' ? 'POSICIONES PUBLICADAS' : 'EN ESTE NÚCLEO';
-  el('train-count').textContent = shown ? String(paused ? all.length : current.length) : '—';
+  el('train-count').textContent = shown ? String(paused || service === 'avld' ? all.length : current.length) : '—';
   el('count-label').textContent = paused ? `${all.length} POSICIONES EN VISTA CONGELADA` :
-    service === 'avld' ? 'POSICIONES EN EL FEED RECIENTE' : 'POSICIONES GPS RECIENTES';
+    service === 'avld' ? 'POSICIONES PUBLICADAS EN EL MAPA' : 'POSICIONES GPS RECIENTES';
   el('connection').textContent = feedError ? 'CONEXIÓN INTERRUMPIDA · POSICIONES CONSERVADAS' : paused ? 'VISTA CONGELADA · NO ES DIRECTO' :
     latest && Date.now() - latest.timestamp >= FEED_OLD ? 'FEED ANTIGUO · NO ES DIRECTO' : latest ?
       service === 'avld' ? 'FEED AV/LD RECIENTE · NO IMPLICA GPS RECIENTE' : 'RENFE · OBSERVACIONES RECIENTES' : 'CONECTANDO CON RENFE';
   el('live-dot').classList.toggle('live', Boolean(service === 'cercanias' && latest && !feedError && !paused && Date.now() - latest.timestamp < FEED_OLD));
   el('notice').textContent = [feedError && `No se pudieron actualizar las posiciones. ${feedError}`, staticError, mapError,
-    notification, service === 'avld' ? `${all.filter(train => train.observed === null).length}/${all.length} posiciones sin hora GPS individual: antigüedad desconocida. El reloj es del feed. Sin trazados: el GTFS AV/LD no los publica.` : '',
+    notification, service === 'avld' ? `${current.length}/${all.length} posiciones en un feed reciente${paused ? ' (vista congelada)' : ''}. ${all.filter(train => train.observed === null).length}/${all.length} posiciones sin hora GPS individual: antigüedad desconocida. El reloj es del feed. Sin trazados: el GTFS AV/LD no los publica.` : '',
     latest?.excluded ? `${latest.excluded} registros sin GPS válido, duplicados o no ferroviarios excluidos.` : '',
     all.length > current.length && !paused ? `${all.length - current.length} observaciones conservadas/antiguas se muestran grises.` : ''].filter(Boolean).join(' ');
   const selector = el<HTMLSelectElement>('network');
   const networks = new Set([...(service === 'avld' ? ['all-av'] : []), ...Object.keys(rail?.networks ?? {}), ...(latest?.trains.map(train => train.network) ?? [])]);
   const options = [...networks].map(id => {
     const count = latest?.trains.filter(train => (id === 'all-av' || train.network === id) &&
-      !feedError && (service === 'avld' && train.observed === null ? Date.now() - latest!.timestamp < FEED_OLD : fresh(train, latest!))).length ?? 0;
+      (service === 'avld' || !feedError && fresh(train, latest!))).length ?? 0;
     return { id, label: `${networkName(id)} · ${count}` };
   });
   const optionsSignature = JSON.stringify(options);

@@ -100,7 +100,7 @@ export class TrainMap {
     this.visuals = visuals;
     if (!this.ready || !this.map.getSource('positions')) return;
     const data: FeatureCollection<Point> = { type: 'FeatureCollection', features: visuals.map(({ train, coordinates, recent }) => ({
-      type: 'Feature', properties: { key: train.key, color: recent ? train.route?.color ?? '#a8c1cf' : '#637881',
+      type: 'Feature', properties: { key: train.key, color: recent ? train.route?.color ?? '#a8c1cf' : '#a6b0b5',
         line: lineName(train), selected: train.key === this.selected?.key }, geometry: { type: 'Point', coordinates },
     })) };
     this.source('positions', data);
